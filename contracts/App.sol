@@ -1,4 +1,4 @@
-pragma solidity >=0.4.4 <0.6.0;
+pragma solidity >=0.4.2 <0.6.0;
 
 // TODO: Figure out how to use https://github.com/pipermerriam/ethereum-datetime ?
 // TODO: Auto transactions prob wont work?
@@ -37,8 +37,8 @@ contract App {
      * Representation of a loan proposal
      */
     struct Proposal {
-        address payable borrower; //address of the borrower
-        address payable lender;   //address of the lender
+        address borrower; //address of the borrower
+        address lender;   //address of the lender
         Status status;    //status of the proposal
         Terms terms;      //terms of the proposal
         uint256 collat;    //amount of staked collateral
@@ -55,7 +55,7 @@ contract App {
     mapping (address=>bool) private activeBorrowers;
 
     function makeProposal(
-        address payable lender,
+        address lender,
         uint256 due,
         uint256 amt,
         uint256 interest,

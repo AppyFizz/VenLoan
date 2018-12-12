@@ -1,4 +1,4 @@
-pragma solidity >=0.4.4 <0.6.0;
+pragma solidity >=0.4.2 <0.6.0;
 
 // TODO: Figure out how to use https://github.com/pipermerriam/ethereum-datetime ?
 // TODO: Auto transactions prob wont work?
@@ -63,8 +63,8 @@ contract Core {
     }
 
     struct Loan {
-        address payable borrower;
-        address payable lender;
+        address borrower;
+        address lender;
         uint256 collateral;
         Terms terms;
         State state;
@@ -81,8 +81,8 @@ contract Core {
      * 
      */
     function initLoan(
-        address payable borrower,
-        address payable lender,
+        address borrower,
+        address lender,
         uint256 amount,
         uint256 interest,
         uint256 start,
