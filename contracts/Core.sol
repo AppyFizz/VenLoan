@@ -57,7 +57,7 @@ contract Core {
     struct State {
         uint256 principal_rem;
         uint256 interest;
-        uint32 pay_period;
+        RepayPeriod pay_period;
         uint32 last_payed;
         uint32 next_due;
     }
@@ -74,6 +74,7 @@ contract Core {
     bool mutex = true;
 
     Loan loan;
+    
     bool collateral_deducted = false;
 
     /**
@@ -91,12 +92,15 @@ contract Core {
     ) external {
         require(!init_called, "initLoan() called more than once");
 
-        loan = Loan({
-            borrower: borrower,
-            lender: lender
+        State memory state = State({
+            principal_rem: amount,
+            last_payed: 0,
+            interest: (interest * amount) / (100 * per2Freq(period)),
+            pay_period: period,
+            next_due: getTime(start, toDays(period))
         });
-   
-        loan.terms = Terms({
+
+        Terms memory terms = Terms({
             principal: amount,
             annual_int_rate: interest,
             start_date: start,
@@ -104,15 +108,22 @@ contract Core {
             period: period,
             min_collateral: min_collat
         });
-   
-        loan.state = State({
-            principal_rem: amount,
-            interest: (interest * amount) / (100 * per2Freq(period)),
-            pay_period: period,
-            next_due: getTime(start, toDays(period))
-        }); 
+
+        loan = Loan({
+            borrower: borrower,
+            lender: lender,
+            collateral: 0,
+            terms: terms,
+            state: state
+        });
    
         init_called = true;
+    }
+
+    function deductPrincipal() external payable {
+        require (init_called, "deductPrincipal() called before initLoan()");
+        require (msg.value == loan.terms.principal, "wrong principal amount passed to deductPrincipal()");
+        loan.borrower.transfer(msg.value);
     }
 
     function deductCollateral() external payable {
