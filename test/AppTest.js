@@ -26,8 +26,7 @@ contract("App", accounts => {
                 {from: borrower}
             );
         }).then((response) => {
-            console.log(response.toNumber());
-            assert(response.toNumber(), 0, "Creating Proposal Failed"); 
+            assert.equal(response.toNumber(), "0", "Creating Proposal Failed"); 
         });
       });
 
@@ -53,7 +52,7 @@ contract("App", accounts => {
             {from: lender}
         );
     }).then((response) => {
-        assert(response, true, "Accepting Proposal Failed");
+        assert(response, "Accepting Proposal Failed");
     });
   });
 
