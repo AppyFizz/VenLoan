@@ -30,8 +30,8 @@ contract Core {
     struct Terms {
         uint256 principal;
         uint256 annual_int_rate;
-        uint32 start_date;
-        uint32 due_date;
+        uint256 start_date;
+        uint256 due_date;
         RepayPeriod period;
         uint256 min_collateral;
     }
@@ -40,13 +40,13 @@ contract Core {
      * 
      */
     struct PaymentInfo {
-        uint32 timestamp;
+        uint256 timestamp;
         uint256 interest_due;
         uint256 from_borrower;
         uint256 from_collateral;
     }
 
-    PaymentInfo[] public PayHistory = new PaymentInfo[](0);
+    PaymentInfo[] public PayHistory;
 
     // Principal, interest
     // user makes payments every 'period'
@@ -58,8 +58,8 @@ contract Core {
         uint256 principal_rem;
         uint256 interest;
         RepayPeriod pay_period;
-        uint32 last_payed;
-        uint32 next_due;
+        uint256 last_payed;
+        uint256 next_due;
     }
 
     struct Loan {
@@ -85,12 +85,13 @@ contract Core {
         address payable lender,
         uint256 amount,
         uint256 interest,
-        uint32 start,
-        uint32 due,
+        uint256 start,
+        uint256 due,
         RepayPeriod period,
         uint256 min_collat
-    ) external {
+    ) external payable {
         require(!init_called, "initLoan() called more than once");
+        require (msg.value >= min_collat, "not enough collateral passed to initLoan()");
 
         State memory state = State({
             principal_rem: amount,
@@ -116,6 +117,8 @@ contract Core {
             terms: terms,
             state: state
         });
+
+        loan.collateral = msg.value;
    
         init_called = true;
     }
@@ -126,29 +129,17 @@ contract Core {
         loan.borrower.transfer(msg.value);
     }
 
-    function deductCollateral() external payable {
-        require (init_called, "deductCollateral() called before initLoan()");
-        require (msg.value >= loan.terms.min_collateral, "not enough collateral passed to deductCollateral()");
-        
-        require (mutex, "deductCollateral() couldn't obtain lock");
-        mutex = false;
-        
-        loan.collateral = msg.value;
-        
-        mutex = true;
-    }
-
-    function getBalance() external returns (uint256) {
+    function getBalance() external view returns (uint256) {
         return loan.state.principal_rem;
     }
 
-    function getNextDue() external returns (uint32, uint256) {
+    function getNextDue() external view returns (uint256, uint256) {
         return (loan.state.next_due, loan.state.interest);
     }
 
-    function getLoanInfo() external returns (
+    function getLoanInfo() external view returns (
         uint256, uint256,
-        uint32, uint32,
+        uint256, uint256,
         RepayPeriod, uint256
     ) {
         return (
@@ -203,19 +194,19 @@ contract Core {
     // called by auto-scheduler
     // if at least interest not paid for this period, deduct it from collateral,
     // otherwise (if collat over) neg balance for user? and deduct from pool
-    function ensureLoanPayment() private {
+    // function ensureLoanPayment() private {
         
-    }
+    // }
 
-    function getDays(uint32 start, uint32 end) private returns (uint32) {
+    function getDays(uint256 start, uint256 end) private pure returns (uint256) {
         return (end - start) / 86400;
     }
 
-    function getTime(uint32 start, uint32 num_days) private returns (uint32) {
+    function getTime(uint256 start, uint256 num_days) private pure returns (uint256) {
         return start + num_days * 86400;
     }
 
-    function per2Freq(RepayPeriod period) private returns (uint32) {
+    function per2Freq(RepayPeriod period) private pure returns (uint256) {
         if (period == RepayPeriod.WEEKLY) {
             return 52;
         } else if (period == RepayPeriod.BI_WEEKLY) {
@@ -231,7 +222,7 @@ contract Core {
         }
     }
 
-    function toDays(RepayPeriod period) private returns(uint32) {
+    function toDays(RepayPeriod period) private pure returns(uint256) {
         if (period == RepayPeriod.WEEKLY) {
             return 7;
         } else if (period == RepayPeriod.BI_WEEKLY) {
