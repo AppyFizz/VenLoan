@@ -87,6 +87,16 @@ contract App {
             return false;
         }
     }
+
+    function rejectProposal(uint256 proposal_id) external view returns(bool) {
+        require(proposal_id < proposalList.length);
+        Proposal memory prop = proposalList[proposal_id];
+        if ((prop.borrower == msg.sender || prop.borrower == msg.sender) && prop.status != Status.ACC) {
+            prop.status = Status.REJ;
+            return true;
+        }
+        return false;
+    }
     
     function viewBorrowProposals() external view returns(uint256[] memory) {
         return borrowProposals[msg.sender];
