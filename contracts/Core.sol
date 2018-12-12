@@ -28,12 +28,12 @@ contract Core {
      * The terms related to the loan
      */
     struct Terms {
-        uint32 principal;
-        uint32 annual_int_rate;
+        uint256 principal;
+        uint256 annual_int_rate;
         uint32 start_date;
         uint32 due_date;
-        RepayPeriod frequency;
-        uint32 min_collateral;
+        RepayPeriod period;
+        uint256 min_collateral;
     }
 
      /**
@@ -41,10 +41,12 @@ contract Core {
      */
     struct PaymentInfo {
         uint32 timestamp;
-        uint32 interest_due;
-        uint32 from_borrower;
-        uint32 from_collateral;
+        uint256 interest_due;
+        uint256 from_borrower;
+        uint256 from_collateral;
     }
+
+    PaymentInfo[] public PayHistory = new PaymentInfo[](0);
 
     // Principal, interest
     // user makes payments every 'period'
@@ -53,19 +55,19 @@ contract Core {
     // yearlyInterest is calculated based on remaining principal
 
     struct State {
-        uint32 principal_rem;
-        uint32 interest;
+        uint256 principal_rem;
+        uint256 interest;
         uint32 pay_period;
         uint32 last_payed;
         uint32 next_due;
-        PaymentInfo[] paid;
     }
 
     struct Loan {
-        address borrower;
-        address lender;
-        uint32 collateral;
+        address payable borrower;
+        address payable lender;
+        uint256 collateral;
         Terms terms;
+        State state;
     }
 
     bool init_called = false;
@@ -78,111 +80,113 @@ contract Core {
      * 
      */
     function initLoan(
-        address borrower,
-        address lender,
-        uint32 amount,
-        uint32 interest,
+        address payable borrower,
+        address payable lender,
+        uint256 amount,
+        uint256 interest,
         uint32 start,
         uint32 due,
-        RepayPeriod freq,
-        uint32 min_collat
+        RepayPeriod period,
+        uint256 min_collat
     ) external {
-        require(!init_called);
+        require(!init_called, "initLoan() called more than once");
+
+        loan = Loan({
+            borrower: borrower,
+            lender: lender
+        });
    
-        terms = new Terms({
+        loan.terms = Terms({
             principal: amount,
             annual_int_rate: interest,
             start_date: start,
             due_date: due,
-            frequency: freq,
+            period: period,
             min_collateral: min_collat
         });
    
-        state = new State({
+        loan.state = State({
             principal_rem: amount,
-            interest: (interest * amount) / (100 * period),
+            interest: (interest * amount) / (100 * per2Freq(period)),
             pay_period: period,
-            next_due: getTime(start, toDays(period)),
-            paid: new PaymentInfo[](0)
+            next_due: getTime(start, toDays(period))
         }); 
-   
-        loan = new Loan({
-            borrower: borrower,
-            lender: lender,
-            terms: terms,
-            state: state
-        });
    
         init_called = true;
     }
 
     function deductCollateral() external payable {
-        require (init_called);
-        require (msg.value >= loan.terms.min_collateral);
-        require (mutex);
+        require (init_called, "deductCollateral() called before initLoan()");
+        require (msg.value >= loan.terms.min_collateral, "not enough collateral passed to deductCollateral()");
+        
+        require (mutex, "deductCollateral() couldn't obtain lock");
         mutex = false;
+        
         loan.collateral = msg.value;
+        
         mutex = true;
     }
 
-    // borrower calls --> deductCollateral
-    // lender calls --> deductLoanAmount
-
-    // give all past payments and maybe their dates?
-    function getRepayHistory() external returns (PaymentInfo[]) {
-        return loan.state.paid;
-    }
-
-    function getBalance() external returns (uint32) {
+    function getBalance() external returns (uint256) {
         return loan.state.principal_rem;
     }
 
-    function getNextDue() external returns (uint32, uint32) {
+    function getNextDue() external returns (uint32, uint256) {
         return (loan.state.next_due, loan.state.interest);
     }
 
     function getLoanInfo() external returns (
+        uint256, uint256,
         uint32, uint32,
-        uint32, uint32,
-        uint32, uint32
+        RepayPeriod, uint256
     ) {
         return (
             loan.terms.principal,
             loan.terms.annual_int_rate,
-            loan.terms.start,
-            loan.terms.due,
-            loan.terms.frequency,
-            loan.terms.min_collateral
+            loan.terms.start_date,
+            loan.terms.due_date,
+            loan.terms.period,
+            loan.collateral
         );
     }
 
-    function makeLoanPayment() external payable {
-        require (init_called);
-        require (mutex);
+    function makeLoanPayment() external payable returns (bool) {
+        require (init_called, "makeLoanPayment() called before initLoan()");
+        
+        require (mutex, "makeLoanPayment() couldn't obtain lock");
         mutex = false;
 
-        loan.lender.send(loan.state.interest);
-
-        pay_info = new PaymentInfo({
+        PaymentInfo memory pay_info = PaymentInfo({
             timestamp: now,
             interest_due: loan.state.interest,
             from_borrower: msg.value,
+            from_collateral: 0
         });
 
-        extra = msg.value - loan.state.interest;
+        uint256 extra = msg.value - loan.state.interest;
         if (extra < 0) {
             pay_info.from_collateral = -extra;
+            loan.collateral -= extra;
+        } else if (extra >= loan.state.principal_rem) {
+            pay_info.from_borrower = loan.state.interest + loan.state.principal_rem;
+            loan.borrower.transfer(extra - loan.state.principal_rem);
+            loan.state.principal_rem = 0;
         } else {
             loan.state.principal_rem -= extra;
-            loan.state.interest = (loan.terms.annual_int_rate * loan.state.principal_rem) / (100 * period),
+            loan.state.interest = (loan.terms.annual_int_rate * loan.state.principal_rem) / (100 * per2Freq(loan.terms.period));
         }
 
-        loan.state.last_payed = pay_info.timestamp;
-        loan.state.next_due = getTime(loan.state.next_due, toDays(period));
-        
-        loan.state.paid.push(pay_info);
+        loan.lender.transfer(pay_info.from_borrower + pay_info.from_collateral);
 
+        loan.state.last_payed = pay_info.timestamp;
+        loan.state.next_due = getTime(loan.state.next_due, toDays(loan.terms.period));
+        
+        PayHistory.push(pay_info);
+
+        bool loan_paid = loan.state.principal_rem <= 0;  
         mutex = true;
+
+        return loan_paid;
     }
 
     // called by auto-scheduler
@@ -200,16 +204,32 @@ contract Core {
         return start + num_days * 86400;
     }
 
+    function per2Freq(RepayPeriod period) private returns (uint32) {
+        if (period == RepayPeriod.WEEKLY) {
+            return 52;
+        } else if (period == RepayPeriod.BI_WEEKLY) {
+            return 26;
+        } else if (period == RepayPeriod.MONTHLY) {
+            return 12;
+        } else if (period == RepayPeriod.QUARTERLY) {
+            return 4;
+        } else if (period == RepayPeriod.BI_ANNUALLY) {
+            return 2;
+        } else {
+            // Not possible
+        }
+    }
+
     function toDays(RepayPeriod period) private returns(uint32) {
-        if (period == WEEKLY) {
+        if (period == RepayPeriod.WEEKLY) {
             return 7;
-        } else if (period == BI_WEEKLY) {
+        } else if (period == RepayPeriod.BI_WEEKLY) {
             return 14;
-        } else if (period == MONTHLY) {
+        } else if (period == RepayPeriod.MONTHLY) {
             return 30;
-        } else if (period == QUARTERLY) {
+        } else if (period == RepayPeriod.QUARTERLY) {
             return 90;
-        } else if (period == BI_ANNUALLY) {
+        } else if (period == RepayPeriod.BI_ANNUALLY) {
             return 180;
         } else {
             // Not possible
