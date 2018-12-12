@@ -29,7 +29,7 @@ contract App {
     struct Terms {
         uint256 due;                     //due_date of the loan
         uint256 amt;                     //amount of the loan
-        Core.RepayPeriod freqPayments;  //frequency of loan payments
+        Core.RepayPeriod freqPayments;   //frequency of loan payments
         uint256 interest;                //annualized interest rate of the loan
     }
 
