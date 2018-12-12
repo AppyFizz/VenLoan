@@ -72,8 +72,8 @@ contract App {
         return id;
     }
 
-    function acceptProposal(uint256 proposal_id) external view returns(bool) {
-        require(proposal_id < proposalList.length);
+    function acceptProposal(uint256 proposal_id) external returns(bool) {
+        require(proposal_id < proposalList.length, "acceptProposal() length beyond expected");
         Proposal memory prop = proposalList[proposal_id];
         if (prop.lender == msg.sender && prop.status == Status.PND) {
             if (prop.expiry < now) {
