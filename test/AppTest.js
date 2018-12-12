@@ -1,7 +1,3 @@
-// // id = borrower.makeProposal(lender, due, amt, interest, freqPayments, collat, expiry)
-// // lender.acceptProposal(id)
-// // borrower.initiateLoan(id)
-
 const App = artifacts.require("App");
 const assert = require('assert');
 
@@ -26,7 +22,7 @@ contract("App", accounts => {
                 {from: borrower}
             );
         }).then((response) => {
-            assert.equal(response.toNumber(), "0", "Creating Proposal Failed"); 
+            assert.equal(response.toNumber(), 0, "Creating Proposal Failed"); 
         });
       });
 
@@ -53,6 +49,40 @@ contract("App", accounts => {
         );
     }).then((response) => {
         assert(response, "Accepting Proposal Failed");
+    });
+  });
+
+  it("init loan", async() => {
+    [borrower, lender] = accounts;
+    const app = await App.new();
+    await App.deployed().then((instance) => {
+        instanceObj = instance;
+        var start = 60 + Math.floor(Date.now() / 1000);
+        return instance.makeProposal(
+            lender,
+            start,
+            100,
+            10,
+            3,
+            50,
+            start + 3600,
+            {from: borrower}
+        );
+    }).then((response) => {
+        return instanceObj.acceptProposal(
+            0,
+            {from: lender}
+        );
+    }).then((response) => {
+        return instanceObj.initiateLoan(
+            0,
+            {from: borrower, value: 60}
+        );
+    }).then((response) => {
+        instanceObj.sendPrincipal(
+            0,
+            {from: lender, value: 100}
+        );
     });
   });
 

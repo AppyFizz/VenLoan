@@ -6,15 +6,8 @@ pragma solidity >=0.4.2 <0.6.0;
 
 contract Core {
 
-//     modifier loaneesOnly {
-//       if(msg.sender != loan.actorAccounts.mortgageHolder) {
-//          throw;
-//       }
-//       _;
-//    }
-
     /**
-     * 
+     * Payments made every:
      */
     enum RepayPeriod {
         WEEKLY,
@@ -37,7 +30,7 @@ contract Core {
     }
 
      /**
-     * 
+     * Info about past payments
      */
     struct PaymentInfo {
         uint256 timestamp;
@@ -46,13 +39,10 @@ contract Core {
         uint256 from_collateral;
     }
 
+    /**
+     * Publicly accessible, to read pay history
+     */
     PaymentInfo[] public PayHistory;
-
-    // Principal, interest
-    // user makes payments every 'period'
-    // frequency sepcifies the number of 'period's per year
-    // if this payment is < yearlyInterest / numPeriods, subtract rest from collateral
-    // yearlyInterest is calculated based on remaining principal
 
     struct State {
         uint256 principal_rem;

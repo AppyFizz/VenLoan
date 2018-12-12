@@ -18,11 +18,6 @@ contract App {
         EXP  // Expired
     }
 
-    // id = borrower.makeProposal(lender, due, amt, interest, freqPayments, collat, expiry)
-    // lender.acceptProposal(id)
-    // borrower.initiateLoan(id)
-    // 
-
     /* 
      * The terms related to the loan
      */
@@ -153,10 +148,4 @@ contract App {
         core = coreList[loan_id];
         return core.getLoanInfo();
     }
-
-    // function viewPaymentHistory(uint256 loan_id) external returns(Core.PaymentInfo[] memory) {
-    //     require(loan_id < coreList.length);
-    //     core = coreList[loan_id];
-    //     return core.PayHistory();
-    // }
 }
